@@ -1,0 +1,166 @@
+// CheckConnection.ino by Costas 15/8/16 for kongol.ml
+
+#define BLYNK_PRINT Serial    // Comment this out to disable prints and save space
+#include <ESP8266WiFi.h>
+#include <BlynkSimpleEsp8266.h>
+#include <SimpleTimer.h>  // Essential for all Blynk Projects
+
+char auth[] = "78c7ff80bcfa4155bcf1629ed1f25437";
+char ssid[] = "SAMPATH";
+char pass[] = "0112845127";
+bool Connected2Blynk = false;
+int ledState = LOW; /*new update*/
+volatile boolean flag=false;
+volatile int trigTimeOut;
+WidgetLED led1(V1);
+
+BlynkTimer timer;
+
+void notifyOnButtonPress()
+{
+  flag = true;
+  trigTimeOut = millis() / 1000;
+ /* // Invert state, since button is "Active HIGH"
+ int isButtonPressed = digitalRead(D2);
+  if (isButtonPressed) {
+    Serial.println("triggered 1");
+    
+    delay(2000);
+if(digitalRead(D2))
+{
+   Serial.println("triggered 2");
+delay(2000);
+if(digitalRead(D2))
+{
+    // Note:
+    //   We allow 1 notification per 15 seconds for now.
+     Serial.println("triggered last");
+    Blynk.notify("Home Security Triggered!!");
+    digitalWrite(D7, HIGH); 
+    
+}
+    
+}
+    
+  }
+*/
+}
+
+
+void setup() {
+  Serial.begin(115200);
+  delay(10);
+  timer.setInterval(11000L, CheckConnection); // check if still connected every 11 seconds
+  timer.setInterval(2000, activityLED);   //activity LED timer
+  Serial.println("\nStarted");
+  MyWiFi();
+  pinMode(D7, OUTPUT);
+   pinMode (D2, INPUT);
+   pinMode(D1, OUTPUT);
+  attachInterrupt(digitalPinToInterrupt(D2), notifyOnButtonPress, RISING);
+}
+
+void MyWiFi(){
+  int mytimeout = millis() / 1000;
+  WiFi.begin(ssid, pass);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+    if((millis() / 1000) > mytimeout + 3){ // try for less than 4 seconds to connect to WiFi router
+      break;
+    }
+  }
+
+  if(WiFi.status() == WL_CONNECTED){  
+    Serial.print("\nIP address: ");
+    Serial.println(WiFi.localIP()); 
+    Blynk.config(auth);
+  Connected2Blynk = Blynk.connect(1000);  // 1000 is a timeout of 3333 milliseconds 
+  mytimeout = millis() / 1000;
+  while (Blynk.connect(1000) == false) { 
+    if((millis() / 1000) > mytimeout + 3){ // try for less than 4 seconds
+      break;
+    }
+  }  
+  }
+  else{
+    Serial.println("\nCheck Router ");    
+  }
+  
+}
+
+void CheckConnection(){
+  Connected2Blynk = Blynk.connected();
+  if(!Connected2Blynk){
+    Serial.println("Not connected to Blynk server");
+    MyWiFi();  
+  }
+  else{
+    Serial.println("Still connected to Blynk server");    
+  }
+}
+
+void activityLED(){   /*new update*/
+   if (ledState == LOW) {
+      ledState = HIGH;
+    } else {
+      ledState = LOW;
+    }
+
+    // set the LED with the ledState of the variable:
+    digitalWrite(D1, ledState); 
+  }
+
+
+
+BLYNK_WRITE(V5)
+{   
+  int value = param.asInt(); // Get value as integer
+if(value == 0)
+{
+  digitalWrite(D7, LOW); 
+  }else{
+    digitalWrite(D7, HIGH); 
+    }
+}
+
+BLYNK_WRITE(V2)
+{
+   if (led1.getValue()) {
+    led1.off();
+    Serial.println("LED on V1: off");
+  } else {
+    led1.on();
+    Serial.println("LED on V1: on");
+  }
+}
+
+
+void loop() {
+ if(WiFi.status() == WL_CONNECTED){  
+  if(Connected2Blynk){
+    Blynk.run();  // only process Blyk.run() function if we are connected to Blynk server
+  }
+  timer.run();
+
+ }
+   if(flag == true)
+   {
+    if((millis() / 1000) > trigTimeOut + 3){ // try for less than 4 seconds
+        
+         if(digitalRead(D2)){
+         Serial.println("triggered last");
+         
+         if(WiFi.status() == WL_CONNECTED){
+         Blynk.notify("Home Security Triggered!!");
+         }
+         
+         digitalWrite(D7, HIGH); 
+         flag = false;
+         }else{
+          flag = false;
+          }
+    }
+   }
+  
+}
